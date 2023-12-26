@@ -1,5 +1,5 @@
 Program -> DeclarationList
-DeclarationList -> Declaration Declaration-list | EPSILON
+DeclarationList -> Declaration DeclarationList | EPSILON
 Declaration -> DeclarationInitial DeclarationPrime
 DeclarationInitial -> TypeSpecifier ID
 DeclarationPrime -> FunDeclarationPrime | VarDeclarationPrime

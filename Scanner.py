@@ -1,73 +1,7 @@
-from collections import defaultdict
-
 symbol_table = {}
 symbol_tokens = [';', ':', ',', '[', ']', '(', ')', '{', '}', '+', '-', '*', '=', '<', '=', '/']
 whitespace_tokens = [' ', '\n', '\r', '\t', '\v', '\f']
 keyword_tokens = ['if', 'else', 'void', 'int', 'while', 'break', 'return']
-
-errors_list = defaultdict(list)
-
-
-def init_keywords():
-    symbol_table['keywords'] = keyword_tokens
-    symbol_table['ids'] = []
-
-
-def get_token(lexeme):
-    if lexeme in keyword_tokens:
-        return 'KEYWORD'
-    return 'ID'
-
-
-def install_id(lexeme):
-    if lexeme in symbol_table['keywords']:
-        return lexeme
-
-    for i in symbol_table['ids']:
-        if lexeme == i:
-            return i
-    symbol_table['ids'].append(lexeme)
-    return lexeme
-
-
-# def save_tokens():
-#     f = open('tokens.txt', 'w+')
-#     for line in tokens_list:
-#         if len(tokens_list[line]) > 0:
-#             line_string = str(line) + '.\t'
-#             for token in tokens_list[line]:
-#                 line_string += str(f"({token[0]}, {token[1]}) ")
-#             line_string += '\n'
-#             f.write(line_string)
-#
-#     f.close()
-
-
-def save_symbols():
-    symbols = ''
-    i, j = 0, 0
-    for i in range(len(symbol_table['keywords'])):
-        symbols += f"{(i + 1)}.\t{symbol_table['keywords'][i]}\n"
-    for j in range(len(symbol_table['ids'])):
-        symbols += f"{(i + 1) + (j + 1)}.\t{symbol_table['ids'][j]}\n"
-
-    f = open('symbol_table.txt', 'w+')
-    f.write(symbols)
-    f.close()
-
-
-def save_errors():
-    errors_string = ''
-    for line in errors_list:
-        if len(errors_list[line]) > 0:
-            line_string = str(line) + '.\t'
-            for error in errors_list[line]:
-                line_string += str(f"({error[0]}, {error[1]}) ")
-            errors_string += line_string + '\n'
-
-    f = open("lexical_errors.txt", 'w+')
-    f.write('There is no lexical error.' if len(errors_string) == 0 else errors_string)
-    f.close()
 
 
 class Scanner:
@@ -76,10 +10,20 @@ class Scanner:
         self.line_num = 1
         self.cursor = 0
         self.finished = False
-        self.tokens_list = defaultdict(list)
 
-        init_keywords()
+        self.tokens_list = {}
+
+        Scanner.init_keywords()
         self.input_stream = self.read_input()
+        self.shown_index = 0
+        self.shown_tokens = []
+
+        self.max_lines = 0
+        with open(path, 'r') as f:
+            temp = f.readlines()
+            self.max_lines = len(temp)
+            if temp[-1][-1] == '\n':
+                self.max_lines += 1
 
     def read_input(self):
         f = open(self.input_path, 'r')
@@ -92,6 +36,25 @@ class Scanner:
             lines.append(line)
 
         return ''.join(lines)
+
+    def init_keywords():
+        symbol_table['keywords'] = keyword_tokens
+        symbol_table['ids'] = []
+
+    def get_token(lexeme):
+        if lexeme in keyword_tokens:
+            return 'KEYWORD'
+        return 'ID'
+
+    def install_id(lexeme):
+        if lexeme in symbol_table['keywords']:
+            return lexeme
+
+        for i in symbol_table['ids']:
+            if lexeme == i:
+                return i
+        symbol_table['ids'].append(lexeme)
+        return lexeme
 
     def get_comment(self, multiline, starting_line):
         starting_point = self.cursor
@@ -108,15 +71,15 @@ class Scanner:
                 self.line_num += 1
                 if not multiline:
                     self.cursor += 1
-                    return self.get_next_token()
+                    return self._get_next_token()
             elif multiline:
                 if cur_char == '*' and self.input_stream[self.cursor + 1] == '/':  # check doesn't crash
                     self.cursor += 2
-                    return self.get_next_token()
+                    return self._get_next_token()
 
             self.cursor += 1
 
-    def get_next_token(self):
+    def _get_next_token(self):
         lexeme = ''
         while self.cursor < len(self.input_stream):
             cur_char = self.input_stream[self.cursor]
@@ -126,7 +89,7 @@ class Scanner:
                 if cur_char == '\n':
                     self.line_num += 1
                 self.cursor += 1
-                return self.get_next_token()
+                return self._get_next_token()
 
             elif cur_char in symbol_tokens:
                 if cur_char == '=':
@@ -181,7 +144,7 @@ class Scanner:
                 if self.cursor == len(self.input_stream) - 1 \
                         or self.input_stream[self.cursor + 1] in symbol_tokens \
                         or self.input_stream[self.cursor + 1] in whitespace_tokens:
-                    return (get_token(lexeme), install_id(lexeme)), None
+                    return (Scanner.get_token(lexeme), Scanner.install_id(lexeme)), None
                 else:
                     self.cursor += 1
                     lexeme += self.input_stream[self.cursor]
@@ -195,10 +158,29 @@ class Scanner:
 
     def run(self):
         while not self.finished:
-            token, error = self.get_next_token()
+            token, error = self._get_next_token()
             self.cursor += 1
             if token[0] == 'INVALID' or token[0] == 'DONE':
                 if token[0] == 'INVALID':
-                    errors_list[error[1]].append((token[1], error[0]))
+                    pass
+                    # self.errors_list[error[1]].append((token[1], error[0]))
                 continue
+            if not self.line_num in self.tokens_list:
+                self.tokens_list[self.line_num] = []
             self.tokens_list[self.line_num].append(token)
+        for line in sorted(self.tokens_list.keys()):
+            if len(self.tokens_list[line]) > 0:
+                for token in self.tokens_list[line]:
+                    self.shown_tokens.append((token[0], token[1], line))
+        self.shown_tokens.append(('$', '$', self.max_lines))
+
+    def show(self):
+        if len(self.shown_tokens) == 0:
+            self.run()
+        return self.shown_tokens[self.shown_index]
+
+    def pop(self):
+        if len(self.shown_tokens) == 0:
+            self.run()
+        self.shown_index += 1
+        return self.shown_tokens[self.shown_index - 1]
