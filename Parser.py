@@ -106,7 +106,7 @@ class Parser():
                 if not terminal in self.table[variable]:
                     self.table[variable][terminal] = ('SYNCH', None)
 
-    # when creating a table, in follows choose a rule that goes to eps, this finds that grammar
+    # when creating a table, in follows choose a rule that first goes to eps, this finds that grammar
     def find_nullable_production(self, variable):
         for production in self.grammar[variable]:
             if 'epsilon' in self.first(production):
