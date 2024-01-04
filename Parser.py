@@ -100,17 +100,19 @@ class Parser():
                     for terminal in first_set:
                         self.table[variable][terminal] = ('CORRECT', production)
 
-        # recovery mode
+        # recovery mode when variable doesn't have epsilon in first, turns follow into synch
         for variable in self.grammar.keys():
             for terminal in self.follows[variable]:
                 if not terminal in self.table[variable]:
                     self.table[variable][terminal] = ('SYNCH', None)
 
+    # when creating a table, in follows choose a rule that goes to eps, this finds that grammar
     def find_nullable_production(self, variable):
         for production in self.grammar[variable]:
             if 'epsilon' in self.first(production):
                 return production
 
+    # when we have a terminal in creating tree
     def move_up(self):
         root = self.cur_root
         while root.parent:
@@ -122,10 +124,12 @@ class Parser():
         self.cur_root = root
         # root.children.append(VarNode('$', root))
 
+    # when we want to expand a rule
     def move_down(self, production):
         self.cur_root.children = [VarNode(i, self.cur_root) for i in production]
         self.cur_root = self.cur_root.children[0]
 
+    # big_a is first element of stack and small_a is first element of scanner
     def Move(self, big_A, small_a):
         ret = False
         # base cases
@@ -249,6 +253,7 @@ class Parser():
         ret.add('epsilon')
         return ret
 
+    # turn our node to anytree node
     def make_nodes(self, root, par):
         if not root.valid:
             return
