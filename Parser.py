@@ -1,10 +1,12 @@
 from anytree import Node, RenderTree
 
+from Codegen import Codegen
 from Scanner import Scanner
 
 NODE_NUMBER = 0
 
-class VarNode():  # VarNode class used for parser
+
+class VarNode:  # VarNode class used for parser
     def __init__(self, value, parent=None):
         global NODE_NUMBER
         self.parent = parent
@@ -19,19 +21,20 @@ class VarNode():  # VarNode class used for parser
         self.valid = False
 
 
-class Parser():
+class Parser:
     def __init__(self, file_name):
         self.errors = []
         self.cur_root = VarNode('Program')
         self.scanner = Scanner(file_name)
+        self.codegen = Codegen()
         self.grammar = {'Program': [['DeclarationList']],
                         'DeclarationList': [['Declaration', 'DeclarationList'], ['epsilon']],
                         'Declaration': [['DeclarationInitial', 'DeclarationPrime']],
-                        'DeclarationInitial': [['TypeSpecifier', 'ID']],
+                        'DeclarationInitial': [['TypeSpecifier', '#pid', 'ID']],
                         'DeclarationPrime': [['FunDeclarationPrime'], ['VarDeclarationPrime']],
-                        'VarDeclarationPrime': [[';'], ['[', 'NUM', ']', ';']],
+                        'VarDeclarationPrime': [[';'], ['[', '#p_index', 'NUM', '#set_index', ']', ';']],
                         'FunDeclarationPrime': [['(', 'Params', ')', 'CompoundStmt']],
-                        'TypeSpecifier': [['int'], ['void']],
+                        'TypeSpecifier': [['#set_id_type', 'int'], ['#set_id_type', 'void']],
                         'Params': [['int', 'ID', 'ParamPrime', 'ParamList'], ['void']],
                         'ParamList': [[',', 'Param', 'ParamList'], ['epsilon']],
                         'Param': [['DeclarationInitial', 'ParamPrime']],
@@ -40,39 +43,88 @@ class Parser():
                         'StatementList': [['Statement', 'StatementList'], ['epsilon']],
                         'Statement': [['ExpressionStmt'], ['CompoundStmt'], ['SelectionStmt'], ['IterationStmt'],
                                       ['ReturnStmt']],
-                        'ExpressionStmt': [['Expression', ';'], ['break', ';'], [';']],
-                        'SelectionStmt': [['if', '(', 'Expression', ')', 'Statement', 'else', 'Statement']],
-                        'IterationStmt': [['while', '(', 'Expression', ')', 'Statement']],
+                        'ExpressionStmt': [['Expression', ';', '#cleanup'], ['break', ';'], [';']],
+                        'SelectionStmt': [['if', '(', 'Expression', ')', '#save', 'Statement', '#jpf_save', 'else', 'Statement', '#jmp']],
+                        'IterationStmt': [['while', '#label', '(', 'Expression', ')', '#save', 'Statement', '#while']],
                         'ReturnStmt': [['return', 'ReturnStmtPrime']],
                         'ReturnStmtPrime': [[';'], ['Expression', ';']],
-                        'Expression': [['SimpleExpressionZegond'], ['ID', 'B']],
-                        'B': [['=', 'Expression'], ['[', 'Expression', ']', 'H'], ['SimpleExpressionPrime']],
-                        'H': [['=', 'Expression'], ['G', 'D', 'C']],
+                        'Expression': [['SimpleExpressionZegond'], ['#pid', 'ID', 'B']],
+                        'B': [['=', 'Expression', '#assign'], ['[', 'Expression', ']', '#p_array_addr', 'H'], ['SimpleExpressionPrime']],
+                        'H': [['=', 'Expression', '#assign'], ['G', 'D', 'C']],
                         'SimpleExpressionZegond': [['AdditiveExpressionZegond', 'C']],
                         'SimpleExpressionPrime': [['AdditiveExpressionPrime', 'C']],
-                        'C': [['Relop', 'AdditiveExpression'], ['epsilon']],
+                        'C': [['#push_op', 'Relop', 'AdditiveExpression', '#eval'], ['epsilon']],
                         'Relop': [['<'], ['==']],
                         'AdditiveExpression': [['Term', 'D']],
                         'AdditiveExpressionPrime': [['TermPrime', 'D']],
                         'AdditiveExpressionZegond': [['TermZegond', 'D']],
-                        'D': [['Addop', 'Term', 'D'], ['epsilon']],
+                        'D': [['#push_op', 'Addop', 'Term', '#eval', 'D'], ['epsilon']],
                         'Addop': [['+'], ['-']],
                         'Term': [['SignedFactor', 'G']],
                         'TermPrime': [['SignedFactorPrime', 'G']],
                         'TermZegond': [['SignedFactorZegond', 'G']],
-                        'G': [['*', 'SignedFactor', 'G'], ['epsilon']],
-                        'SignedFactor': [['+', 'Factor'], ['-', 'Factor'], ['Factor']],
+                        'G': [['#push_op', '*', 'SignedFactor', '#eval', 'G'], ['epsilon']],
+                        'SignedFactor': [['+', 'Factor'], ['-', 'Factor', '#neg'], ['Factor']],
                         'SignedFactorPrime': [['FactorPrime']],
-                        'SignedFactorZegond': [['+', 'Factor'], ['-', 'Factor'], ['FactorZegond']],
-                        'Factor': [['(', 'Expression', ')'], ['ID', 'VarCallPrime'], ['NUM']],
+                        'SignedFactorZegond': [['+', 'Factor'], ['-', 'Factor', '#neg'], ['FactorZegond']],
+                        'Factor': [['(', 'Expression', ')'], ['ID', 'VarCallPrime'], ['#pnum', 'NUM']],
                         'VarCallPrime': [['(', 'Args', ')'], ['VarPrime']],
                         'VarPrime': [['[', 'Expression', ']'], ['epsilon']],
                         'FactorPrime': [['(', 'Args', ')'], ['epsilon']],
-                        'FactorZegond': [['(', 'Expression', ')'], ['NUM']],
+                        'FactorZegond': [['(', 'Expression', ')'], ['#pnum', 'NUM']],
                         'Args': [['ArgList'], ['epsilon']],
                         'ArgList': [['Expression', 'ArgListPrime']],
-                        'ArgListPrime': [[',', 'Expression', 'ArgListPrime'], ['epsilon']],
+                        'ArgListPrime': [[',', 'Expression', 'ArgListPrime'], ['epsilon']]
                         }
+        self.grammar2 = {'Program': [['DeclarationList']],
+                            'DeclarationList': [['Declaration', 'DeclarationList'], ['epsilon']],
+                            'Declaration': [['DeclarationInitial', 'DeclarationPrime']],
+                            'DeclarationInitial': [['TypeSpecifier', 'ID']],
+                            'DeclarationPrime': [['FunDeclarationPrime'], ['VarDeclarationPrime']],
+                            'VarDeclarationPrime': [[';'], ['[', 'NUM', ']', ';']],
+                            'FunDeclarationPrime': [['(', 'Params', ')', 'CompoundStmt']],
+                            'TypeSpecifier': [['int'], ['void']],
+                            'Params': [['int', 'ID', 'ParamPrime', 'ParamList'], ['void']],
+                            'ParamList': [[',', 'Param', 'ParamList'], ['epsilon']],
+                            'Param': [['DeclarationInitial', 'ParamPrime']],
+                            'ParamPrime': [['[', ']'], ['epsilon']],
+                            'CompoundStmt': [['{', 'DeclarationList', 'StatementList', '}']],
+                            'StatementList': [['Statement', 'StatementList'], ['epsilon']],
+                            'Statement': [['ExpressionStmt'], ['CompoundStmt'], ['SelectionStmt'], ['IterationStmt'],
+                                          ['ReturnStmt']],
+                            'ExpressionStmt': [['Expression', ';'], ['break', ';'], [';']],
+                            'SelectionStmt': [['if', '(', 'Expression', ')', 'Statement', 'else', 'Statement']],
+                            'IterationStmt': [['while', '(', 'Expression', ')', 'Statement']],
+                            'ReturnStmt': [['return', 'ReturnStmtPrime']],
+                            'ReturnStmtPrime': [[';'], ['Expression', ';']],
+                            'Expression': [['SimpleExpressionZegond'], ['ID', 'B']],
+                            'B': [['=', 'Expression'], ['[', 'Expression', ']', 'H'], ['SimpleExpressionPrime']],
+                            'H': [['=', 'Expression'], ['G', 'D', 'C']],
+                            'SimpleExpressionZegond': [['AdditiveExpressionZegond', 'C']],
+                            'SimpleExpressionPrime': [['AdditiveExpressionPrime', 'C']],
+                            'C': [['Relop', 'AdditiveExpression'], ['epsilon']],
+                            'Relop': [['<'], ['==']],
+                            'AdditiveExpression': [['Term', 'D']],
+                            'AdditiveExpressionPrime': [['TermPrime', 'D']],
+                            'AdditiveExpressionZegond': [['TermZegond', 'D']],
+                            'D': [['Addop', 'Term', 'D'], ['epsilon']],
+                            'Addop': [['+'], ['-']],
+                            'Term': [['SignedFactor', 'G']],
+                            'TermPrime': [['SignedFactorPrime', 'G']],
+                            'TermZegond': [['SignedFactorZegond', 'G']],
+                            'G': [['*', 'SignedFactor', 'G'], ['epsilon']],
+                            'SignedFactor': [['+', 'Factor'], ['-', 'Factor'], ['Factor']],
+                            'SignedFactorPrime': [['FactorPrime']],
+                            'SignedFactorZegond': [['+', 'Factor'], ['-', 'Factor'], ['FactorZegond']],
+                            'Factor': [['(', 'Expression', ')'], ['ID', 'VarCallPrime'], ['NUM']],
+                            'VarCallPrime': [['(', 'Args', ')'], ['VarPrime']],
+                            'VarPrime': [['[', 'Expression', ']'], ['epsilon']],
+                            'FactorPrime': [['(', 'Args', ')'], ['epsilon']],
+                            'FactorZegond': [['(', 'Expression', ')'], ['NUM']],
+                            'Args': [['ArgList'], ['epsilon']],
+                            'ArgList': [['Expression', 'ArgListPrime']],
+                            'ArgListPrime': [[',', 'Expression', 'ArgListPrime'], ['epsilon']],
+                            }
         self.firsts = self.init_first()
         self.follows = self.init_follow()
         self.stack = ['$', 'Program']
@@ -100,19 +152,17 @@ class Parser():
                     for terminal in first_set:
                         self.table[variable][terminal] = ('CORRECT', production)
 
-        # recovery mode when variable doesn't have epsilon in first, turns follow into synch
+        # recovery mode
         for variable in self.grammar.keys():
             for terminal in self.follows[variable]:
                 if not terminal in self.table[variable]:
                     self.table[variable][terminal] = ('SYNCH', None)
 
-    # when creating a table, finds a grammar that the first goes to eps
     def find_nullable_production(self, variable):
         for production in self.grammar[variable]:
             if 'epsilon' in self.first(production):
                 return production
 
-    # when we have a terminal in creating tree
     def move_up(self):
         root = self.cur_root
         while root.parent:
@@ -124,17 +174,22 @@ class Parser():
         self.cur_root = root
         # root.children.append(VarNode('$', root))
 
-    # when we want to expand a rule
     def move_down(self, production):
         self.cur_root.children = [VarNode(i, self.cur_root) for i in production]
         self.cur_root = self.cur_root.children[0]
 
-    # big_a is first element of stack and small_a is first element of scanner
-    def Move(self, big_A, small_a):
+    def Move(self, big_A, small_a, lookahead):
+        # print(big_A, ':', small_a, ':', self.stack)
         ret = False
         # base cases
         if big_A == small_a == '$':
             ret = True
+
+        if big_A.startswith('#'):
+            self.stack.pop()
+            #self.move_up()
+            self.codegen.code_gen(big_A, lookahead)
+            return ret
 
         if big_A == 'epsilon':
             self.stack.pop()
@@ -197,10 +252,11 @@ class Parser():
 
     def parse(self):
         stack_top, lookahead_top = self.stack[-1], self.scanner.show()
-        while not self.Move(stack_top, self.choose_token(lookahead_top)):
+        while not self.Move(stack_top, self.choose_token(lookahead_top), lookahead_top[1]):
             stack_top, lookahead_top = self.stack[-1], self.scanner.show()
         self.write_errors()
-        self.write_tree()
+        self.codegen.print_output()
+        #self.write_tree()
 
     def init_first(self):
         ret = {}
@@ -244,6 +300,8 @@ class Parser():
     def first(self, production):
         ret = set([])
         for variable in production:
+            if variable.startswith('#'):
+                continue
             temp = self.first_variable(variable)
             if 'epsilon' in temp:
                 temp = set([i for i in temp if not i == 'epsilon'])
@@ -253,7 +311,6 @@ class Parser():
         ret.add('epsilon')
         return ret
 
-    # turn our node to anytree node
     def make_nodes(self, root, par):
         if not root.valid:
             return
