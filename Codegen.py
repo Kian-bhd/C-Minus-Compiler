@@ -2,6 +2,7 @@ class Codegen:
     def __init__(self):
         self.SS = []
         self.PB = []
+        self.BS = []
         self.i = 0
         self.cur_type = 'void'
         self.addr = 100
@@ -32,7 +33,7 @@ class Codegen:
             idx = self.SS.pop()
             idx = idx[1:]
             addr = self.SS.pop()
-            self.SS.append((int(addr) + 4 * (int(idx) - 1)))
+            self.SS.append((int(addr) + 4 * (int(idx))))
         elif action == '#push_op':
             self.SS.append(lexeme)
         elif action == '#eval':
@@ -74,6 +75,16 @@ class Codegen:
             jmp_target = self.SS.pop()
             self.PB[bp_addr] = f'JPF, {cond}, {self.i + 1}, '
             self.insert_code('JP', jmp_target)
+        elif action == '#new_bs':
+            self.BS.append('<')
+        elif action == '#break':
+            self.BS.append(self.i)
+            self.insert_code('JP', '?')
+        elif action == '#end_bs':
+            break_addr = self.BS.pop()
+            while break_addr != '<':
+                self.PB[break_addr] = f'JP, {self.i}, , '
+                break_addr = self.BS.pop()
 
     def get_temp(self):
         tmp = self.temp_addr
@@ -82,7 +93,7 @@ class Codegen:
 
     def insert_code(self, one, two, three='', four=''):
         self.PB.append(f'{one}, {two}, {three}, {four}')
-        print(self.PB)
+        self.print_output()
         self.i += 1
 
     def update_index(self, addr, idx):
