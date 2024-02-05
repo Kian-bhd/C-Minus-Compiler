@@ -9,7 +9,7 @@ class Codegen:
         self.cur_scope = 0
         self.addr = 100
         self.temp_addr = 500
-        self.symbol_table = []  # [['var1', type1, addr1, size, scope], ['var2', type2, addr2, size, scope], ['fun1', 'func', [return_value, argument_list, return_address, cur_i], argcnt, scope]]
+        self.symbol_table = []  # [['var1', type1, addr1, size, scope], ['var2', type2, addr2, size, scope], ['fun1', 'func', [return_value, argument_list, return_address, cur_i], argcnt, scope, func_addr]]
         self.op_dict = {'+': 'ADD', '-': 'SUB', '*': 'MULT', '<': 'LT', '==': 'EQ'}
         self.main_addr = None
 
@@ -97,8 +97,8 @@ class Codegen:
         elif action == '#scope_minus':
             for record in self.symbol_table[::-1]:
                 print(record)
-                if record[4] == self.cur_scope:
-                    del self.symbol_table[-1]
+                if record[1] != 'func' and record[4] == self.cur_scope:
+                    del self.symbol_table[self.symbol_table.index(record)]
             self.cur_scope -= 1
         elif action == '#func_init':
             self.symbol_table.append('>>')
@@ -112,10 +112,17 @@ class Codegen:
             self.SS.append(return_val)
             self.SS.append(return_addr)
             func_name = self.symbol_table[args_idx - 1][0]
-            self.symbol_table.append([func_name, 'func', [return_val, args_list, return_addr, self.i], argcnt, self.cur_scope])
+            func_addr = self.symbol_table[args_idx - 1][2]
+            del self.symbol_table[args_idx - 1]
+            self.symbol_table.append([func_name, 'func', [return_val, args_list, return_addr, self.i], argcnt, self.cur_scope - 1, func_addr])
             if func_name == 'main':
                 self.main_addr = self.i
                 self.PB[0] = f'JP, {self.main_addr}, , '
+        elif action == '#func_fin':
+            func_name = self.find_func_name(self.SS[0])
+            argcnt = self.find_func_argcnt(func_name)
+            for _ in range(argcnt + 1):
+                self.SS.pop()
         elif action == '#new_rs':
             self.RS.append('<')
         elif action == '#return':
@@ -132,6 +139,11 @@ class Codegen:
                 ret_elem = self.RS.pop()
         elif action == '#implicit_zero_return':
             self.SS.append('#0')
+        elif action == '#func_call':
+            return_val = self.get_temp()
+            return_addr = self.get_temp()
+            self.SS.append(return_val)
+            self.SS.append(return_addr)
 
     def get_temp(self):
         tmp = self.temp_addr
@@ -147,8 +159,6 @@ class Codegen:
         for var in self.symbol_table[::-1]:
             if var[2] == addr:
                 var[3] = idx
-                print('Symbol Table:')
-                print(self.symbol_table)
                 return
 
     def find_addr(self, lexeme, insert=False):
@@ -162,6 +172,19 @@ class Codegen:
         self.temp_addr += 4
         return self.symbol_table[-1][2]
 
+    def find_func_name(self, addr):
+        for record in self.symbol_table:
+            print(record)
+            if record[1] == 'func' and str(record[5]) == str(addr):
+                return record[0]
+
+    def find_func_argcnt(self, name):
+        for record in self.symbol_table:
+            if record[1] == 'func' and record[0] == name:
+                return record[3]
+
     def print_output(self):
+        print('Symbol Table:')
+        print(self.symbol_table)
         for i in range(len(self.PB)):
             print(f'{i}\t({self.PB[i]})')
