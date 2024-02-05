@@ -73,7 +73,7 @@ class Parser:
                         'FactorPrime': [['(', 'Args', ')', '#func_call'], ['epsilon']],
                         'FactorZegond': [['(', 'Expression', ')'], ['#pnum', 'NUM']],
                         'Args': [['ArgList'], ['epsilon']],
-                        'ArgList': [['Expression', '#push_arg_first', 'ArgListPrime']],
+                        'ArgList': [['Expression', '#push_arg', 'ArgListPrime']],
                         'ArgListPrime': [[',', 'Expression', '#push_arg', 'ArgListPrime'], ['epsilon']]
                         }
         self.grammar2 = {'Program': [['DeclarationList']],

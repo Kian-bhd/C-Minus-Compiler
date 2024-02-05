@@ -1,10 +1,12 @@
 class Codegen:
     def __init__(self):
+        self.elem_len = 0
         self.return_val_reg = 96
         self.return_addr_reg = 92
         self.stack_pointer = 88
         self.SS = []
-        self.PB = [f'ASSIGN, #0, {self.return_addr_reg}, ', f'ASSIGN, #0, {self.return_val_reg}, ', f'ASSIGN, #3000, {self.stack_pointer}']
+        self.PB = [f'ASSIGN, #0, {self.return_addr_reg}, ', f'ASSIGN, #0, {self.return_val_reg}, ',
+                   f'ASSIGN, #3000, {self.stack_pointer}']
         self.BS = []
         self.RS = []
         self.main_addr = None
@@ -127,7 +129,8 @@ class Codegen:
             func_name = self.symbol_table[args_idx - 1][0]
             func_addr = self.symbol_table[args_idx - 1][2]
             del self.symbol_table[args_idx - 1]
-            self.symbol_table.append([func_name, 'func', [None, args_list, None, self.i - 1], argcnt, self.cur_scope - 1, func_addr])
+            self.symbol_table.append(
+                [func_name, 'func', [None, args_list, None, self.i - 1], argcnt, self.cur_scope - 1, func_addr])
             if func_name == 'main':
                 print("mewo")
                 print(self.main_jp)
@@ -179,11 +182,11 @@ class Codegen:
                 self.insert_code('ADD', f'{self.stack_pointer}', '#4', f'{self.stack_pointer}')
 
                 self.insert_code('ASSIGN', f'#{self.i + 2}', f'{self.return_addr_reg}')
-                self.SS.append(self.find_pb_idx(self.SS.pop()))
+                self.SS.append(self.find_pb_idx(self.SS.pop()) + 1)
                 self.insert_code('JP', f'{self.SS[-1]}')
 
                 self.insert_code('SUB', f'{self.stack_pointer}', '#4', f'{self.stack_pointer}')
-                self.insert_code('ASSIGN', f'@{self.stack_pointer}', f'{self.return_addr_reg}',)
+                self.insert_code('ASSIGN', f'@{self.stack_pointer}', f'{self.return_addr_reg}', )
                 # self.insert_code('SUB', f'{self.stack_pointer}', '#4', f'{self.stack_pointer}')
                 # self.insert_code('ASSIGN', f'@{self.stack_pointer}', f'{self.return_val_reg}',)
 
@@ -201,25 +204,22 @@ class Codegen:
                 self.SS.pop()
                 self.SS.append(func_temp)
             self.addr = 100
-
-        elif action == '#push_arg_first':
-            # if self.SS[-2] == 'output':
-            #     return
-            self.insert_code('ASSIGN', f'{self.SS.pop()}', f'{self.addr}')
-            # self.SS.append('<')
-            self.addr += 4
         elif action == '#push_arg':
-            # if self.SS[-2] == 'output':
-            #     return
+            self.elem_len = self.find_func_argcnt(self.find_func_name(self.SS[-1]))
             self.insert_code('ASSIGN', f'{self.SS.pop()}', f'{self.addr}')
             self.addr += 4
         elif action == '#param_enter':
             self.addr = 100
         elif action == '#param_exit':
             self.addr = 100
+        elif action == '#param_is_array':
+            self.SS.append('#is_array')
         elif action == '#param_assign':
+            if self.SS[-1] == '#is_array':
+                pass
             self.insert_code('ASSIGN', f'{self.addr}', f'{self.SS.pop()}', )
             self.addr += 4
+
         elif action == '#return_anyway':
             if self.main_addr is None:
                 self.insert_code('JP', f'@{self.return_addr_reg}')
@@ -286,6 +286,5 @@ class Codegen:
 
     def write_output(self):
         with open('output.txt', 'w+') as f:
-
             for i in range(len(self.PB)):
                 f.write(f'{i}\t({self.PB[i]})\n')
