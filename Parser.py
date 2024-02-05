@@ -33,10 +33,10 @@ class Parser:
                         'DeclarationInitial': [['TypeSpecifier', '#pid_dec', 'ID']],
                         'DeclarationPrime': [['FunDeclarationPrime'], ['VarDeclarationPrime']],
                         'VarDeclarationPrime': [[';'], ['[', '#p_index', 'NUM', '#set_index', ']', ';']],
-                        'FunDeclarationPrime': [['#scope_plus', '#func_init', '(', 'Params', ')', '#func_symbol', '#new_rs', 'CompoundStmt', '#end_rs', '#func_fin', '#scope_minus']],
+                        'FunDeclarationPrime': [['#scope_plus', '#func_init', '(', '#param_enter', 'Params', '#param_exit', ')', '#func_symbol', '#new_rs', 'CompoundStmt', '#end_rs', '#return_anyway', '#func_fin', '#scope_minus']],
                         'TypeSpecifier': [['#set_id_type', 'int'], ['#set_id_type', 'void']],
-                        'Params': [['#set_id_type', 'int', '#pid_dec', 'ID', 'ParamPrime', 'ParamList'], ['#set_id_type', 'void']],
-                        'ParamList': [[',', 'Param', 'ParamList'], ['epsilon']],
+                        'Params': [['#set_id_type', 'int', '#pid_dec', 'ID', 'ParamPrime', '#param_assign', 'ParamList'], ['#set_id_type', 'void']],
+                        'ParamList': [[',', 'Param', '#param_assign', 'ParamList'], ['epsilon']],
                         'Param': [['DeclarationInitial', 'ParamPrime']],
                         'ParamPrime': [['[', ']'], ['epsilon']],
                         'CompoundStmt': [['{', 'DeclarationList', 'StatementList', '}']],
@@ -44,8 +44,8 @@ class Parser:
                         'Statement': [['ExpressionStmt'], ['CompoundStmt'], ['SelectionStmt'], ['IterationStmt'],
                                       ['ReturnStmt']],
                         'ExpressionStmt': [['Expression', ';', '#cleanup'], ['break', '#break', ';'], [';']],
-                        'SelectionStmt': [['if', '(', 'Expression', ')', '#save', '#scope_plus', 'Statement', '#scope_minus', '#jpf_save', 'else',  '#scope_plus', 'Statement', '#scope_minus', '#jmp']],
-                        'IterationStmt': [['while', '#label', '(', 'Expression', ')', '#new_bs', '#save', '#scope_plus', 'Statement', '#scope_minus', '#while', '#end_bs']],
+                        'SelectionStmt': [['if', '(', 'Expression', ')', '#save', 'Statement', '#jpf_save', 'else', 'Statement', '#jmp']],
+                        'IterationStmt': [['while', '#label', '(', 'Expression', ')', '#new_bs', '#save', 'Statement', '#while', '#end_bs']],
                         'ReturnStmt': [['return', 'ReturnStmtPrime', '#return']],
                         'ReturnStmtPrime': [['#implicit_zero_return', ';'], ['Expression', ';']],
                         'Expression': [['SimpleExpressionZegond'], ['#pid', 'ID', 'B']],
@@ -68,13 +68,13 @@ class Parser:
                         'SignedFactorPrime': [['FactorPrime']],
                         'SignedFactorZegond': [['+', 'Factor'], ['-', 'Factor', '#neg'], ['FactorZegond']],
                         'Factor': [['(', 'Expression', ')'], ['#pid', 'ID', 'VarCallPrime'], ['#pnum', 'NUM']],
-                        'VarCallPrime': [['(', 'Args', ')'], ['VarPrime']],
+                        'VarCallPrime': [['(', 'Args', ')', '#func_call'], ['VarPrime']],
                         'VarPrime': [['[', 'Expression', '#p_array_addr', ']'], ['epsilon']],
-                        'FactorPrime': [['(', 'Args', ')'], ['epsilon']],
+                        'FactorPrime': [['(', 'Args', ')', '#func_call'], ['epsilon']],
                         'FactorZegond': [['(', 'Expression', ')'], ['#pnum', 'NUM']],
                         'Args': [['ArgList'], ['epsilon']],
-                        'ArgList': [['Expression', 'ArgListPrime']],
-                        'ArgListPrime': [[',', 'Expression', 'ArgListPrime'], ['epsilon']]
+                        'ArgList': [['Expression', '#push_arg_first', 'ArgListPrime']],
+                        'ArgListPrime': [[',', 'Expression', '#push_arg', 'ArgListPrime'], ['epsilon']]
                         }
         self.grammar2 = {'Program': [['DeclarationList']],
                             'DeclarationList': [['Declaration', 'DeclarationList'], ['epsilon']],
@@ -255,7 +255,7 @@ class Parser:
         while not self.Move(stack_top, self.choose_token(lookahead_top), lookahead_top[1]):
             stack_top, lookahead_top = self.stack[-1], self.scanner.show()
         self.write_errors()
-        self.codegen.print_output()
+        self.codegen.write_output()
         #self.write_tree()
 
     def init_first(self):
