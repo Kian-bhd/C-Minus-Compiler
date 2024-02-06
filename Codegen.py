@@ -23,6 +23,7 @@ class Codegen:
         for i in range(100):
             self.temp_list[i] = []
         self.op_dict = {'+': 'ADD', '-': 'SUB', '*': 'MULT', '<': 'LT', '==': 'EQ'}
+        self.semantic_errors = []
 
     def code_gen(self, action, lexeme):
         # print(self.temp_list)
@@ -167,7 +168,6 @@ class Codegen:
                 # self.SS.pop()
             else:
                 addresses = []
-                temps = []
                 for item in self.symbol_table:
                     if item[1] != 'func' and item[4] == self.cur_scope:
                         addresses.append(item[2])
@@ -290,3 +290,10 @@ class Codegen:
         with open('output.txt', 'w+') as f:
             for i in range(len(self.PB)):
                 f.write(f'{i}\t({self.PB[i]})\n')
+
+    def write_errors(self):
+        with open('semantic_errors.txt', 'w+') as f:
+            if len(self.semantic_errors) == 0:
+                f.write("The input program is semantically correct.")
+            else :
+                pass
