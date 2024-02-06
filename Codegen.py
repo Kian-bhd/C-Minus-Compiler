@@ -185,7 +185,7 @@ class Codegen:
                 self.insert_code('ADD', f'{self.stack_pointer}', '#4', f'{self.stack_pointer}')
 
                 self.insert_code('ASSIGN', f'#{self.i + 2}', f'{self.return_addr_reg}')
-                self.SS.append(self.find_pb_idx(self.SS.pop()) + 1)
+                self.SS.append(self.find_pb_idx(self.SS.pop()))
                 self.insert_code('JP', f'{self.SS[-1]}')
 
                 self.insert_code('SUB', f'{self.stack_pointer}', '#4', f'{self.stack_pointer}')
