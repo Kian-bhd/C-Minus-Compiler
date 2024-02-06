@@ -26,7 +26,7 @@ class Parser:
         self.errors = []
         self.cur_root = VarNode('Program')
         self.scanner = Scanner(file_name)
-        self.codegen = Codegen()
+        self.codegen = Codegen(self.scanner)
         self.grammar = {'Program': [['DeclarationList']],
                         'DeclarationList': [['Declaration', 'DeclarationList'], ['epsilon']],
                         'Declaration': [['DeclarationInitial', 'DeclarationPrime']],
@@ -188,7 +188,7 @@ class Parser:
         if big_A.startswith('#'):
             self.stack.pop()
             #self.move_up()
-            self.codegen.code_gen(big_A, lookahead)
+            self.codegen.code_gen(big_A, lookahead, self.scanner.show()[2])
             return ret
 
         if big_A == 'epsilon':

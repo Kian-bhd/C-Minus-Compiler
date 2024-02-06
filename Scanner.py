@@ -184,3 +184,4 @@ class Scanner:
             self.run()
         self.shown_index += 1
         return self.shown_tokens[self.shown_index - 1]
+
