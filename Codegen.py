@@ -22,7 +22,7 @@ class Codegen:
         self.cur_scope = 0
         self.addr = 100
         self.temp_addr = 500
-        self.symbol_table = []  # [['var1', type1, addr1, size, scope], ['var2', type2, addr2, size, scope], ['fun1', 'func', [return_value, argument_list, return_address, cur_i], argcnt, scope, func_addr]]
+        self.symbol_table = []  # [['var1', type1, addr1, size, scope], ['var2', type2, addr2, size, scope], [fun1, 'func', [return_value, argument_list, return_address, cur_i], argcnt, scope, func_addr]]
         self.temp_list = {}
         for i in range(100):
             self.temp_list[i] = []
@@ -49,6 +49,7 @@ class Codegen:
             self.SS.append(addr)
         elif action == '#assign':
             self.insert_code('ASSIGN', self.SS[-1], self.SS[-2])
+            self.check_type_mismatch(self.SS[-1], self.SS[-2])
             self.SS.pop()
         elif action == '#p_index':
             self.SS.append(lexeme)
@@ -73,6 +74,7 @@ class Codegen:
             second = self.SS.pop()
             operator = self.SS.pop()
             first = self.SS.pop()
+            self.check_type_mismatch(first, second)
             result = self.get_temp()
             self.temp_list[self.cur_scope].append(result)
             self.insert_code(self.op_dict[operator], first, second, str(result))
@@ -179,6 +181,13 @@ class Codegen:
                 self.insert_code('PRINT', f'{100}')
                 # self.SS.pop()
             else:
+                addr = self.SS[-1]
+                for record in self.symbol_table:
+                    if record[1] == 'func' and record[-1] == addr:
+                        if (self.addr - 100) // 4 != record[-3]:
+                            self.semantic_errors.append(
+                                f'#{self.line_no}: Semantic Error! Mismatch in numbers of arguments of \'{record[0]}\'.'
+                            )
                 addresses = []
                 for item in self.symbol_table:
                     if item[1] != 'func' and item[4] > 0:
@@ -278,6 +287,10 @@ class Codegen:
 
         if not insert:
             return None
+        if self.cur_type == 'void' and self.cur_scope > 0:
+            self.semantic_errors.append(
+                f'#{self.line_no}: Semantic Error! Illegal type of void for \'{lexeme}\'.'
+            )
         self.symbol_table.append([lexeme, self.cur_type, self.temp_addr, 1, self.cur_scope])
         self.insert_code('ASSIGN', '#0', str(self.temp_addr))
         self.temp_addr += 4
@@ -323,3 +336,27 @@ class Codegen:
             else:
                 for error in self.semantic_errors:
                     f.write(f'{error}\n')
+
+    def check_type_mismatch(self, first, second):
+        if first is None or second is None:
+            return
+        first_type = 'int'
+        second_type = 'int'
+        if not str(first).startswith('#'):
+            for record in self.symbol_table:
+                if record[1] == 'func':
+                    continue
+                elif record[2] == first:
+                    first_type = 'int' if record[3] == 1 else 'array'
+
+        if not str(second).startswith('#'):
+            for record in self.symbol_table:
+                if record[1] == 'func':
+                    continue
+                elif record[2] == second:
+                    second_type = 'int' if record[3] == 1 else 'array'
+
+        if first_type != second_type:
+            self.semantic_errors.append(
+                f'#{self.line_no}: Semantic Error! Type mismatch in operands, Got {second_type} instead of {first_type}.'
+            )
