@@ -25,7 +25,7 @@ class Codegen:
         self.op_dict = {'+': 'ADD', '-': 'SUB', '*': 'MULT', '<': 'LT', '==': 'EQ'}
 
     def code_gen(self, action, lexeme):
-        print(self.temp_list)
+        # print(self.temp_list)
         print('Symbol Table:')
         print(self.symbol_table)
         print(action, ':', lexeme, ':', self.SS)
@@ -109,7 +109,13 @@ class Codegen:
                 self.PB[break_addr] = f'JP, {self.i}, , '
                 break_addr = self.BS.pop()
         elif action == '#scope_plus':
-            self.seen_fun = True
+            if self.seen_fun is False:
+                main_meow = self.PB.pop()
+                self.PB.append('')
+                self.PB.append(main_meow)
+                self.main_jp -= 1
+                self.i += 1
+                self.seen_fun = True
             self.cur_scope += 1
         elif action == '#scope_minus':
             for record in self.symbol_table[::-1]:
@@ -132,9 +138,6 @@ class Codegen:
             self.symbol_table.append(
                 [func_name, 'func', [None, args_list, None, self.i - 1], argcnt, self.cur_scope - 1, func_addr])
             if func_name == 'main':
-                print("mewo")
-                print(self.main_jp)
-                print(self.main_addr)
                 self.main_addr = self.i
                 if self.main_jp < self.i:
                     self.PB[self.main_jp] = f'JP, {self.main_addr}, , '
@@ -233,7 +236,7 @@ class Codegen:
         self.PB.append(f'{one}, {two}, {three}, {four}')
         self.print_output()
         self.i += 1
-        if not self.seen_fun:
+        if self.seen_fun is False:
             self.main_jp += 1
 
     def update_index(self, addr, idx):
@@ -264,7 +267,7 @@ class Codegen:
         for record in self.symbol_table[::-1]:
             print(record)
             if record[1] == 'func' and record[-1] == addr:
-                return record[2][-1] - record[3]
+                return record[2][-1] - 2 * record[3]
 
     def find_func_name(self, addr):
         for record in self.symbol_table:
@@ -278,7 +281,6 @@ class Codegen:
                 return record[3]
 
     def print_output(self):
-        return
         print('Symbol Table:')
         print(self.symbol_table)
         for i in range(len(self.PB)):
