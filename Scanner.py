@@ -184,3 +184,39 @@ class Scanner:
             self.run()
         self.shown_index += 1
         return self.shown_tokens[self.shown_index - 1]
+
+    def show_prev(self):
+        if len(self.shown_tokens) == 0:
+            self.run()
+        if self.shown_index == 0:
+            return self.shown_tokens[0]
+        # print(self.shown_tokens[self.shown_index - 5:self.shown_index + 1])
+        # exit(0)
+        return self.shown_tokens[self.shown_index - 1]
+
+    def find_last_assign(self):
+        temp = self.shown_index
+        while (self.shown_tokens[temp][1] != '='):
+            temp -= 1
+            if temp == -1:
+                raise Exception("Abalfazlll")
+        return self.shown_tokens[temp - 1][1]
+
+    def find_last_operator(self, right=True):
+        temp = self.shown_index
+        while not (self.shown_tokens[temp][1] in ['+', '-', '*', '==', '<']):
+            temp -= 1
+            if temp == -1:
+                raise Exception("Abalfazlll")
+        return self.shown_tokens[temp + 1 if right else temp - 1][1]
+
+    def find_last_arg(self):
+        print(self.shown_tokens[self.shown_index - 5:self.shown_index])
+        exit(0)
+        temp = self.shown_index
+        while not (self.shown_tokens[temp][1] in ['+', '-', '*', '==', '<']):
+            temp -= 1
+            if temp == -1:
+                raise Exception("Abalfazlll")
+        return self.shown_tokens[temp + 1 if right else temp - 1][1]
+

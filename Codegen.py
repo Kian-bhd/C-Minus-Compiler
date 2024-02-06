@@ -1,5 +1,8 @@
+from Scanner import Scanner
+
 class Codegen:
-    def __init__(self):
+    def __init__(self, scanner: Scanner):
+        self.scanner = scanner
         self.elem_len = 0
         self.return_val_reg = 96
         self.return_addr_reg = 92
@@ -24,9 +27,11 @@ class Codegen:
             self.temp_list[i] = []
         self.op_dict = {'+': 'ADD', '-': 'SUB', '*': 'MULT', '<': 'LT', '==': 'EQ'}
         self.semantic_errors = []
+        # todo
+        self.line_no = 0
 
-    def code_gen(self, action, lexeme):
-        # print(self.temp_list)
+    def code_gen(self, action, lexeme, lineno):
+        self.line_no = lineno
         print('Symbol Table:')
         print(self.symbol_table)
         print(action, ':', lexeme, ':', self.SS)
@@ -39,8 +44,13 @@ class Codegen:
             addr = self.find_addr(lexeme, False)
             self.SS.append(addr)
         elif action == '#assign':
-            self.insert_code('ASSIGN', self.SS[-1], self.SS[-2])
-            self.SS.pop()
+            if self.find_in_symbol_table(self.SS[-2]):
+                self.insert_code('ASSIGN', self.SS[-1], self.SS[-2])
+                self.SS.pop()
+            else:
+                self.semantic_errors.append(
+                    f'#{self.line_no}: Semantic Error! \'{self.scanner.find_last_assign()}\' is not defined.')
+                self.SS.pop()
         elif action == '#p_index':
             self.SS.append(lexeme)
         elif action == '#set_index':
@@ -65,9 +75,16 @@ class Codegen:
             operator = self.SS.pop()
             first = self.SS.pop()
             result = self.get_temp()
-            self.temp_list[self.cur_scope].append(result)
-            self.insert_code(self.op_dict[operator], first, second, str(result))
-            self.SS.append(result)
+            self.scanner.find_last_operator()
+            if not self.find_in_symbol_table(second) and (not self.scanner.find_last_operator(True).isdigit()):
+                self.semantic_errors.append(
+                    f'#{self.line_no}: Semantic Error! \'{self.scanner.find_last_operator(True)}\' is not defined.')
+                self.temp_list[self.cur_scope].append(result)
+                self.SS.append(result)
+            else:
+                self.temp_list[self.cur_scope].append(result)
+                self.insert_code(self.op_dict[operator], first, second, str(result))
+                self.SS.append(result)
         elif action == '#save':
             self.SS.append(self.i)
             self.PB.append('')
@@ -169,7 +186,7 @@ class Codegen:
             else:
                 addresses = []
                 for item in self.symbol_table:
-                    if item[1] != 'func' and item[4] == self.cur_scope:
+                    if item[1] != 'func' and item[4] > 0:
                         addresses.append(item[2])
                 for address in addresses:
                     self.insert_code('ASSIGN', f'{address}', f'@{self.stack_pointer}')
@@ -208,6 +225,17 @@ class Codegen:
                 self.SS.append(func_temp)
             self.addr = 100
         elif action == '#push_arg':
+            if len(self.SS) < 1:
+                self.semantic_errors.append(
+                    f'#{self.line_no}: Semantic Error! Not enough operands.')
+                return
+            if not self.find_in_symbol_table((self.SS[-1])):
+                self.semantic_errors.append(
+                    f'#{self.line_no}: Semantic Error! \'{self.scanner.find_last_arg()}\' is not defined.'
+                )
+                self.SS.pop()
+                return
+
             self.elem_len = self.find_func_argcnt(self.find_func_name(self.SS[-1]))
             self.insert_code('ASSIGN', f'{self.SS.pop()}', f'{self.addr}')
             self.addr += 4
@@ -218,6 +246,10 @@ class Codegen:
         elif action == '#param_is_array':
             self.SS.append('#is_array')
         elif action == '#param_assign':
+            if len(self.SS) < 1:
+                self.semantic_errors.append(
+                    f'#{self.line_no}: Semantic Error! Not enough operands.')
+                return
             if self.SS[-1] == '#is_array':
                 pass
             self.insert_code('ASSIGN', f'{self.addr}', f'{self.SS.pop()}', )
@@ -226,6 +258,14 @@ class Codegen:
         elif action == '#return_anyway':
             if self.main_addr is None:
                 self.insert_code('JP', f'@{self.return_addr_reg}')
+
+    def find_in_symbol_table(self, addr):
+        for symbol in self.symbol_table:
+            if symbol[1] == 'func':
+                continue
+            if symbol[2] == addr:
+                return True
+        return False
 
     def get_temp(self):
         tmp = self.temp_addr
@@ -287,13 +327,20 @@ class Codegen:
             print(f'{i}\t({self.PB[i]})')
 
     def write_output(self):
-        with open('output.txt', 'w+') as f:
-            for i in range(len(self.PB)):
-                f.write(f'{i}\t({self.PB[i]})\n')
+        if len(self.semantic_errors) == 0:
+            with open('output.txt', 'w+') as f:
+                for i in range(len(self.PB)):
+                    f.write(f'{i}\t({self.PB[i]})\n')
+        else:
+            with open('output.txt', 'w+') as f:
+                f.write("The code has not been generated.")
+
+
 
     def write_errors(self):
         with open('semantic_errors.txt', 'w+') as f:
             if len(self.semantic_errors) == 0:
                 f.write("The input program is semantically correct.")
-            else :
-                pass
+            else:
+                for error in self.semantic_errors:
+                    f.write(f'{error}\n')
