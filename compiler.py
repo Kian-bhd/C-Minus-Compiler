@@ -1,5 +1,5 @@
 '''
-C-Minus Compiler (Phase 2: Parser)
+C-Minus Compiler (Phase 3: Parser)
 Hamraz Arafati  99109799
 Kian Bahadori   99105312
 '''

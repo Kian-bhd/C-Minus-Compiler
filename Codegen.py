@@ -1,3 +1,25 @@
+
+
+
+
+
+# ------------------------------------------------------------------------------------
+# ---
+from Scanner import Scanner
+
+
+
+# 1: 1, 
+# 2: 1, 
+# 3: 3, 
+# 4: 5, 
+# 5: 9, 
+# 6: 15, 
+# 7: 25, 
+# 8: 41, 
+# 9: 67, 
+# 10: 109,
+
 from Scanner import Scanner
 
 
@@ -5,12 +27,13 @@ class Codegen:
     def __init__(self, scanner: Scanner):
         self.scanner = scanner
         self.elem_len = 0
-        self.return_val_reg = 96
-        self.return_addr_reg = 92
-        self.stack_pointer = 88
+        self.return_val_reg = 400
+        self.return_addr_reg = 404
+        self.stack_pointer = 408
+        self.stack_start = 3000
         self.SS = []
         self.PB = [f'ASSIGN, #0, {self.return_addr_reg}, ', f'ASSIGN, #0, {self.return_val_reg}, ',
-                   f'ASSIGN, #3000, {self.stack_pointer}']
+                   f'ASSIGN, #{self.stack_start}, {self.stack_pointer}']
         self.BS = []
         self.RS = []
         self.main_addr = None
@@ -20,11 +43,12 @@ class Codegen:
         self.i = 3
         self.cur_type = 'void'
         self.cur_scope = 0
-        self.addr = 100
+        self.addr = 412
+        self.ARG_START = 412
         self.temp_addr = 500
         self.symbol_table = []  # [['var1', type1, addr1, size, scope], ['var2', type2, addr2, size, scope], [fun1, 'func', [return_value, argument_list, return_address, cur_i], argcnt, scope, func_addr]]
         self.temp_list = {}
-        for i in range(100):
+        for i in range(1000):
             self.temp_list[i] = []
         self.op_dict = {'+': 'ADD', '-': 'SUB', '*': 'MULT', '<': 'LT', '==': 'EQ'}
         self.semantic_errors = []
@@ -54,7 +78,7 @@ class Codegen:
         elif action == '#p_index':
             self.SS.append(lexeme)
         elif action == '#set_index':
-            self.update_index(self.SS[-2], self.SS[-1])
+            self.update_index(self.SS[-2], int(self.SS[-1]))
             self.temp_addr += 4 * (int(self.SS[-1]) - 1)
             self.SS.pop()
             self.SS.pop()
@@ -178,13 +202,13 @@ class Codegen:
         elif action == '#func_call':
 
             if self.SS[-1] == 'output':
-                self.insert_code('PRINT', f'{100}')
+                self.insert_code('PRINT', f'{self.ARG_START}')
                 # self.SS.pop()
             else:
                 addr = self.SS[-1]
                 for record in self.symbol_table:
                     if record[1] == 'func' and record[-1] == addr:
-                        if (self.addr - 100) // 4 != record[-3]:
+                        if (self.addr - self.ARG_START) // 4 != record[-3]:
                             self.semantic_errors.append(
                                 f'#{self.line_no}: Semantic Error! Mismatch in numbers of arguments of \'{record[0]}\'.'
                             )
@@ -227,20 +251,46 @@ class Codegen:
                 self.insert_code('ASSIGN', f'{self.return_val_reg}', f'{func_temp}')
                 self.SS.pop()
                 self.SS.append(func_temp)
-            self.addr = 100
+            self.addr = self.ARG_START
         elif action == '#push_arg':
             if len(self.SS) < 1:
                 self.semantic_errors.append(
                     f'#{self.line_no}: Semantic Error! Not enough operands.')
                 return
 
-            self.elem_len = self.find_func_argcnt(self.find_func_name(self.SS[-1]))
-            self.insert_code('ASSIGN', f'{self.SS.pop()}', f'{self.addr}')
+            param_counter = (self.addr - self.ARG_START) // 4
+            arg_pointer = self.SS.pop()
+            arg_record = []
+            if self.SS[-1] != 'output':
+                func_name = self.find_func_name(self.SS[-1])
+                argcnt = int(self.find_func_argcnt(func_name))
+                argcnt -= 1
+                func_param_list = []
+                if param_counter > argcnt:
+                    self.addr += 4
+                    return
+                for record in self.symbol_table:
+                    if record[1] == 'func' and record[0] == func_name:
+                        func_param_list = record[2][1][param_counter]
+                    elif record[1] != 'func' and record[2] == arg_pointer:
+                        arg_record = record
+                if str(arg_pointer).startswith('#'):
+                    arg_record = ['0', 'int', 'address_ha_ha', 1, 'scope_ha_ha']
+                elif len(arg_record) == 0:
+                    arg_record = ['0', 'int', 'address_ha_ha', 1, 'scope_ha_ha']
+                print(arg_record)
+                print(func_param_list)
+                if func_param_list[1] != arg_record[1] or (func_param_list[3] > 1 and arg_record[3] == 1) or (func_param_list[3] == 1 and arg_record[3] > 1):
+                    self.semantic_errors.append(
+                        f'#{self.line_no}: Semantic Error! Mismatch in type of argument {param_counter + 1} of \'{func_name}\'. Expected \'{"int" if func_param_list[3] == 1 else "array"}\' but got \'{"array" if arg_record[3] > 1 else "int"}\' instead.'
+                    )
+            self.insert_code('ASSIGN', f'{arg_pointer}', f'{self.addr}')
             self.addr += 4
+
         elif action == '#param_enter':
-            self.addr = 100
+            self.addr = self.ARG_START
         elif action == '#param_exit':
-            self.addr = 100
+            self.addr = self.ARG_START
         elif action == '#param_is_array':
             self.SS.append('#is_array')
         elif action == '#param_assign':
@@ -249,7 +299,11 @@ class Codegen:
                     f'#{self.line_no}: Semantic Error! Not enough operands.')
                 return
             if self.SS[-1] == '#is_array':
-                pass
+                self.SS.pop()
+                self.update_index(self.SS[-1], 100)
+                self.insert_code('ASSIGN', f'#0', f'{self.SS.pop()}', )
+                self.addr += 4
+                return
             self.insert_code('ASSIGN', f'{self.addr}', f'{self.SS.pop()}', )
             self.addr += 4
 
@@ -283,6 +337,8 @@ class Codegen:
                 if record[1] == 'func':
                     return record[-1]
                 else:
+                    if insert == True and self.cur_scope > record[4]:
+                        break
                     return record[2]
 
         if not insert:

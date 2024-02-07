@@ -38,7 +38,7 @@ class Parser:
                         'Params': [['#set_id_type', 'int', '#pid_dec', 'ID', 'ParamPrime', '#param_assign', 'ParamList'], ['#set_id_type', 'void']],
                         'ParamList': [[',', 'Param', '#param_assign', 'ParamList'], ['epsilon']],
                         'Param': [['DeclarationInitial', 'ParamPrime']],
-                        'ParamPrime': [['[', ']'], ['epsilon']],
+                        'ParamPrime': [['[', ']', '#param_is_array'], ['epsilon']],
                         'CompoundStmt': [['{', 'DeclarationList', 'StatementList', '}']],
                         'StatementList': [['Statement', 'StatementList'], ['epsilon']],
                         'Statement': [['ExpressionStmt'], ['CompoundStmt'], ['SelectionStmt'], ['IterationStmt'],
